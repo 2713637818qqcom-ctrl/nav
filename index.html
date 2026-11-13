@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的个人导航 · 效率工作台</title>
+<style>
+:root{
+  --bg:#f7f5f0;
+  --card:#ffffff;
+  --ink:#2c2825;
+  --ink-soft:#7a726c;
+  --accent:#b5654a;
+  --accent-deep:#9a5037;
+  --accent-soft:#f3e3dc;
+  --line:#e8e2d9;
+  --radius:16px;
+  --shadow:0 8px 28px rgba(60,48,40,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.6;
+  min-height:100vh;padding:36px 20px 60px;
+}
+.container{max-width:1060px;margin:0 auto}
+
+/* 顶部时间与问候 */
+.header{text-align:center;margin-bottom:32px}
+.clock{font-size:42px;font-weight:700;letter-spacing:2px;font-variant-numeric:tabular-nums}
+.date-info{font-size:14px;color:var(--ink-soft);margin-top:4px}
+
+/* 搜索框 */
+.search-wrap{max-width:640px;margin:0 auto 40px}
+.engines{display:flex;gap:8px;justify-content:center;margin-bottom:12px;flex-wrap:wrap}
+.eng-btn{
+  padding:5px 14px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink-soft);font-size:13px;cursor:pointer;transition:.2s;
+}
+.eng-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.search-box{
+  display:flex;align-items:center;background:var(--card);
+  border:1px solid var(--line);border-radius:999px;padding:6px 8px 6px 20px;
+  box-shadow:var(--shadow);transition:.2s;
+}
+.search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search-box input{
+  flex:1;border:none;outline:none;font-size:15px;background:transparent;color:var(--ink);
+}
+.search-box button{
+  padding:10px 24px;border-radius:999px;border:none;background:var(--accent);
+  color:#fff;font-size:14px;cursor:pointer;transition:.2s;
+}
+.search-box button:hover{background:var(--accent-deep)}
+
+/* 分类与卡片 */
+.cat-section{margin-bottom:34px}
+.cat-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--line);
+}
+.cat-title{font-size:16px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.cat-title::before{content:"";width:4px;height:16px;border-radius:4px;background:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.card{
+  position:relative;display:flex;align-items:center;gap:12px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px;text-decoration:none;color:var(--ink);
+  transition:.22s;
+}
+.card:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--accent-soft)}
+.icon{
+  width:38px;height:38px;border-radius:10px;flex:none;
+  display:grid;place-items:center;font-weight:700;font-size:16px;
+  background:var(--accent-soft);color:var(--accent-deep);
+}
+.card-info{min-width:0;flex:1}
+.card-name{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-desc{font-size:12px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.del-btn{
+  position:absolute;top:6px;right:8px;border:none;background:transparent;
+  color:var(--ink-soft);font-size:13px;cursor:pointer;opacity:0;transition:.2s;
+}
+.card:hover .del-btn{opacity:1}
+.del-btn:hover{color:#d9534f}
+
+/* 底部工具栏 */
+.toolbar{
+  display:flex;gap:10px;justify-content:center;margin-top:40px;flex-wrap:wrap;
+}
+.tool-btn{
+  padding:8px 18px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink-soft);font-size:13px;cursor:pointer;transition:.2s;
+}
+.tool-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* 弹窗 */
+.modal{
+  position:fixed;inset:0;background:rgba(30,24,20,.5);display:none;
+  align-items:center;justify-content:center;padding:20px;z-index:100;
+}
+.modal.open{display:flex}
+.modal-box{
+  background:var(--card);width:100%;max-width:420px;border-radius:var(--radius);
+  padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.2);
+}
+.modal-box h3{margin-bottom:16px;font-size:18px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:4px}
+.field input,.field select{
+  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
+  font-size:14px;outline:none;background:#fff;
+}
+.field input:focus{border-color:var(--accent)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.btn-primary{padding:9px 20px;border-radius:999px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+.btn-ghost{padding:9px 18px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="header">
+    <div class="clock" id="clock">00:00</div>
+    <div class="date-info" id="dateInfo">加载中...</div>
+  </header>
+
+  <div class="search-wrap">
+    <div class="engines" id="engines"></div>
+    <form class="search-box" id="searchForm">
+      <input type="text" id="searchInput" placeholder="输入关键词搜索..." autocomplete="off" autofocus>
+      <button type="submit">搜索</button>
+    </form>
+  </div>
+
+  <main id="navMain"></main>
+
+  <div class="toolbar">
+    <button class="tool-btn" id="openAddBtn">+ 添加快捷网址</button>
+    <button class="tool-btn" id="resetBtn">恢复默认配置</button>
+  </div>
+</div>
+
+<!-- 添加书签弹窗 -->
+<div class="modal" id="addModal">
+  <div class="modal-box">
+    <h3>添加快捷网址</h3>
+    <form id="addForm">
+      <div class="field">
+        <label>分类</label>
+        <input type="text" id="fCat" placeholder="例如：常用工具 / 开发 / 影音" required>
+      </div>
+      <div class="field">
+        <label>网站名称</label>
+        <input type="text" id="fName" placeholder="例如：我们的小时光" required>
+      </div>
+      <div class="field">
+        <label>网址 (URL)</label>
+        <input type="url" id="fUrl" placeholder="https://..." required>
+      </div>
+      <div class="field">
+        <label>简短备注（可选）</label>
+        <input type="text" id="fDesc" placeholder="一句话说明用途">
+      </div>
+      <div class="field">
+        <label>管理口令（首次填写后自动记住）</label>
+        <input type="password" id="fPwd" placeholder="输入 Cloudflare 设置的 ADMIN_PASSWORD">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="closeModalBtn">取消</button>
+        <button type="submit" class="btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const ENGINES = [
+  { name: "Bing",   url: "https://www.bing.com/search?q=" },
+  { name: "百度",   url: "https://www.baidu.com/s?wd=" },
+  { name: "Google", url: "https://www.google.com/search?q=" },
+  { name: "GitHub", url: "https://github.com/search?q=" },
+  { name: "B站",    url: "https://search.bilibili.com/all?keyword=" }
+];
+
+const CACHE_KEY = "my_personal_nav_cloud_cache";
+const PWD_KEY = "my_personal_nav_pwd";
+let links = JSON.parse(localStorage.getItem(CACHE_KEY) || "[]");
+let currentEngine = 0;
+
+/* 时钟 */
+function updateClock() {
+  const now = new Date();
+  const p = n => String(n).padStart(2, "0");
+  document.getElementById("clock").textContent = `${p(now.getHours())}:${p(now.getMinutes())}`;
+  const weeks = ["周日","周一","周二","周三","周四","周五","周六"];
+  document.getElementById("dateInfo").textContent =
+    `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 · ${weeks[now.getDay()]}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* 搜索引擎切换 */
+const enginesEl = document.getElementById("engines");
+function renderEngines() {
+  enginesEl.innerHTML = ENGINES.map((e, i) =>
+    `<button type="button" class="eng-btn${i===currentEngine?' active':''}" data-i="${i}">${e.name}</button>`
+  ).join("");
+}
+enginesEl.addEventListener("click", e => {
+  const btn = e.target.closest(".eng-btn");
+  if (!btn) return;
+  currentEngine = Number(btn.dataset.i);
+  renderEngines();
+  document.getElementById("searchInput").focus();
+});
+document.getElementById("searchForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const q = document.getElementById("searchInput").value.trim();
+  if (!q) return;
+  window.open(ENGINES[currentEngine].url + encodeURIComponent(q), "_blank");
+});
+renderEngines();
+
+/* 渲染导航卡片 */
+const navMain = document.getElementById("navMain");
+function renderLinks() {
+  if (!links.length) {
+    navMain.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:40px">正在同步云端书签...</div>`;
+    return;
+  }
+  const groups = {};
+  links.forEach(item => {
+    if (!groups[item.cat]) groups[item.cat] = [];
+    groups[item.cat].push(item);
+  });
+
+  navMain.innerHTML = Object.entries(groups).map(([cat, items]) => `
+    <section class="cat-section">
+      <div class="cat-head"><div class="cat-title">${cat}</div></div>
+      <div class="grid">
+        ${items.map(it => `
+          <a class="card" href="${it.url}" target="_blank" rel="noopener">
+            <div class="icon">${it.name.slice(0, 1).toUpperCase()}</div>
+            <div class="card-info">
+              <div class="card-name">${it.name}</div>
+              <div class="card-desc">${it.desc || it.url.replace(/^https?:\/\//, '')}</div>
+            </div>
+            <button type="button" class="del-btn" data-id="${it.id}" title="删除">✕</button>
+          </a>
+        `).join("")}
+      </div>
+    </section>
+  `).join("");
+}
+
+/* 从 Cloudflare D1 拉取最新书签 */
+async function syncFromCloud() {
+  renderLinks(); // 先用本地缓存秒开渲染
+  try {
+    const res = await fetch("/api/links");
+    const data = await res.json();
+    if (data.success && Array.isArray(data.links)) {
+      links = data.links;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(links));
+      renderLinks();
+    }
+  } catch (err) {
+    console.warn("本地预览模式或离线状态，使用缓存数据");
+  }
+}
+
+/* 获取管理口令 */
+function getAdminPwd() {
+  let pwd = localStorage.getItem(PWD_KEY) || "";
+  if (!pwd) {
+    pwd = prompt("请输入管理口令（ADMIN_PASSWORD）：") || "";
+    if (pwd) localStorage.setItem(PWD_KEY, pwd);
+  }
+  return pwd;
+}
+
+/* 删除云端书签 */
+navMain.addEventListener("click", async e => {
+  const del = e.target.closest(".del-btn");
+  if (!del) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (!confirm("确定从云端删除这个书签吗？")) return;
+
+  const id = del.dataset.id;
+  const pwd = getAdminPwd();
+  const res = await fetch(`/api/links?id=${id}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Password": pwd }
+  });
+  const data = await res.json();
+  if (data.success) {
+    syncFromCloud();
+  } else {
+    if (res.status === 401) localStorage.removeItem(PWD_KEY);
+    alert(data.error || "删除失败");
+  }
+});
+
+/* 弹窗与新增云端书签 */
+const modal = document.getElementById("addModal");
+document.getElementById("openAddBtn").onclick = () => {
+  const fPwd = document.getElementById("fPwd");
+  if (fPwd) fPwd.value = localStorage.getItem(PWD_KEY) || "";
+  modal.classList.add("open");
+};
+document.getElementById("closeModalBtn").onclick = () => modal.classList.remove("open");
+modal.onclick = e => { if (e.target === modal) modal.classList.remove("open"); };
+
+document.getElementById("addForm").onsubmit = async e => {
+  e.preventDefault();
+  const fPwd = document.getElementById("fPwd");
+  const pwd = fPwd ? fPwd.value.trim() : getAdminPwd();
+  if (pwd) localStorage.setItem(PWD_KEY, pwd);
+
+  const payload = {
+    cat: document.getElementById("fCat").value.trim(),
+    name: document.getElementById("fName").value.trim(),
+    url: document.getElementById("fUrl").value.trim(),
+    desc: document.getElementById("fDesc").value.trim()
+  };
+
+  const res = await fetch("/api/links", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Password": pwd
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.success) {
+    e.target.reset();
+    modal.classList.remove("open");
+    syncFromCloud();
+  } else {
+    if (res.status === 401) localStorage.removeItem(PWD_KEY);
+    alert(data.error || "保存失败");
+  }
+};
+
+/* 把底部第二个按钮改为手动刷新同步 */
+const resetBtn = document.getElementById("resetBtn");
+resetBtn.textContent = "↻ 刷新云端同步";
+resetBtn.onclick = () => syncFromCloud();
+
+syncFromCloud();
+</script>
+</body>
+</html>
