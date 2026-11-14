@@ -7,7 +7,7 @@ export async function onRequest(context) {
     // 1. GET：获取云端全部书签
     if (method === "GET") {
       const { results } = await env.DB.prepare(
-        "SELECT id, cat, name, url, desc FROM nav_links ORDER BY id ASC"
+        "SELECT id, cat, name, url, desc FROM nav_links ORDER BY CASE WHEN cat = '资源' THEN 0 ELSE 1 END, id ASC"
       ).all();
       return Response.json({ success: true, links: results });
     }
