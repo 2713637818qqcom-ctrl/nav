@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>本地全能文件转换器 · 工具箱</title>
+<title>本地无损文件转换器 · 工具箱</title>
 <style>
 :root{
   --bg:#f7f5f0;
@@ -25,7 +25,6 @@ body{
 }
 .container{max-width:820px;margin:0 auto}
 
-/* 顶部栏 */
 .topbar{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:24px;flex-wrap:wrap;gap:12px;
@@ -45,10 +44,7 @@ body{
 .header h1{font-size:24px;font-weight:700;letter-spacing:.5px}
 .header p{font-size:13.5px;color:var(--ink-soft);margin-top:4px}
 
-/* 模式切换 Tabs */
-.tabs{
-  display:flex;gap:10px;justify-content:center;margin-bottom:22px;
-}
+.tabs{display:flex;gap:10px;justify-content:center;margin-bottom:22px}
 .tab-btn{
   padding:10px 22px;border-radius:999px;border:1px solid var(--line);
   background:var(--card);color:var(--ink-soft);font-size:14px;font-weight:600;
@@ -56,14 +52,12 @@ body{
 }
 .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:var(--shadow)}
 
-/* 主卡片 */
 .panel{
   display:none;background:var(--card);border:1px solid var(--line);
   border-radius:var(--radius);padding:26px;box-shadow:var(--shadow);
 }
 .panel.active{display:block}
 
-/* 拖拽上传区 */
 .dropzone{
   border:2px dashed var(--line);border-radius:14px;padding:34px 20px;
   text-align:center;cursor:pointer;transition:.2s;background:#fcfbf9;
@@ -73,9 +67,8 @@ body{
 .dropzone-title{font-size:15px;font-weight:600}
 .dropzone-sub{font-size:12.5px;color:var(--ink-soft);margin-top:4px}
 
-/* 控制表单 */
 .controls{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
   gap:16px;margin-top:20px;padding-top:20px;border-top:1px solid var(--line);
 }
 .field label{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:6px;font-weight:500}
@@ -86,9 +79,9 @@ body{
 }
 .field select:focus{border-color:var(--accent)}
 .range-row{display:flex;align-items:center;gap:10px}
-.range-val{font-size:13px;font-weight:600;color:var(--accent-deep);min-width:40px;text-align:right}
+.range-val{font-size:13px;font-weight:600;color:var(--accent-deep);min-width:44px;text-align:right}
+.hint-tip{font-size:12px;color:var(--ink-soft);margin-top:10px;background:#faf8f5;padding:10px 14px;border-radius:10px;border:1px solid var(--line)}
 
-/* 按钮 */
 .actions{margin-top:22px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 .btn-primary{
   padding:11px 28px;border-radius:999px;border:none;background:var(--accent);
@@ -103,7 +96,6 @@ body{
 }
 .btn-download:hover{background:#1b5e20}
 
-/* 结果与状态区 */
 .result-box{
   display:none;margin-top:22px;padding:18px;border-radius:12px;
   background:#faf8f5;border:1px solid var(--line);text-align:center;
@@ -115,17 +107,12 @@ body{
   background:#e8f5e9;color:#2e7d32;font-weight:600;margin-left:6px;
 }
 .preview-img{max-width:100%;max-height:260px;border-radius:10px;margin:10px auto;display:block;border:1px solid var(--line)}
-.preview-media{width:100%;max-height:300px;border-radius:10px;margin:10px 0}
+.preview-media{width:100%;max-height:320px;border-radius:10px;margin:10px 0}
 
-/* 进度条 */
 .progress-wrap{display:none;margin-top:18px}
 .progress-wrap.show{display:block}
-.progress-bar{
-  width:100%;height:10px;background:var(--line);border-radius:999px;overflow:hidden;
-}
-.progress-fill{
-  height:100%;width:0%;background:var(--accent);transition:width .25s;
-}
+.progress-bar{width:100%;height:10px;background:var(--line);border-radius:999px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:var(--accent);transition:width .25s}
 .progress-text{font-size:12.5px;color:var(--ink-soft);margin-top:6px;text-align:center}
 </style>
 </head>
@@ -138,21 +125,73 @@ body{
   </div>
 
   <header class="header">
-    <h1>本地全能文件转换器</h1>
-    <p>支持图片格式互转与无损感压缩，以及音视频转码与伴奏提取</p>
+    <h1>本地无损文件转换器</h1>
+    <p>默认优先采用无损封装与高码率输出 · 支持 AVI / MKV / MOV / FLAC / PNG 等全格式</p>
   </header>
 
   <div class="tabs">
-    <button type="button" class="tab-btn active" data-tab="imgPanel">🖼️ 图片转换 / 压缩</button>
-    <button type="button" class="tab-btn" data-tab="avPanel">🎬 音视频转换 / 提取</button>
+    <button type="button" class="tab-btn active" data-tab="avPanel">🎬 音视频无损转换 / 提取</button>
+    <button type="button" class="tab-btn" data-tab="imgPanel">🖼️ 图片无损转换 / 压缩</button>
   </div>
 
-  <!-- ================= 面板 1：图片转换 ================= -->
-  <section class="panel active" id="imgPanel">
+  <!-- ================= 面板 1：音视频转换 ================= -->
+  <section class="panel active" id="avPanel">
+    <div class="dropzone" id="avDrop">
+      <div class="dropzone-icon">🎬</div>
+      <div class="dropzone-title" id="avFileName">点击选择视频或音频，或拖拽到这里</div>
+      <div class="dropzone-sub">支持 AVI / MKV / MOV / MP4 / FLV / WMV / WebM / FLAC / WAV / MP3 / M4A</div>
+      <input type="file" id="avInput" accept="video/*,audio/*,.avi,.mkv,.flv,.wmv,.mov,.flac,.ape" hidden>
+    </div>
+
+    <div class="controls">
+      <div class="field">
+        <label>目标格式与画质策略</label>
+        <select id="avFormat">
+          <optgroup label="视频转换（支持 AVI / MKV / MOV 转 MP4）">
+            <option value="mp4_copy">MP4 · 原画质无损直转（秒转 · 不兼容自动转母带级）</option>
+            <option value="mp4_hq">MP4 · 母带级无损感重编码（CRF 16 · 兼容老式 AVI）</option>
+            <option value="mkv_copy">MKV · 原画质无损封装（兼容任意音视频流）</option>
+            <option value="webm">WebM · 高画质网页视频</option>
+            <option value="gif">GIF · 高清动图（480p · 12fps）</option>
+          </optgroup>
+          <optgroup label="无损与高音质音频提取（可直接从视频提取）">
+            <option value="flac">FLAC · 真无损压缩音频（推荐 · 100% 保留原音质）</option>
+            <option value="wav">WAV · 原始 PCM 真无损音频</option>
+            <option value="mp3">MP3 · 最高规格 320kbps 音频</option>
+            <option value="m4a">M4A · 最高规格 320kbps AAC 音频</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+
+    <div class="hint-tip">
+      💡 <b>无损说明</b>：选择「原画质无损直转」时直接复制原始视频流，<b>0 画质损失且 1～2 秒完成</b>；若遇到编码过于古老的 AVI 文件无法直封装进 MP4，系统会自动无缝切换为 CRF 16 视觉无损重编码。
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn-primary" id="avConvertBtn" disabled>开始无损转换</button>
+    </div>
+
+    <div class="progress-wrap" id="avProgressWrap">
+      <div class="progress-bar"><div class="progress-fill" id="avProgressFill"></div></div>
+      <div class="progress-text" id="avProgressText">准备中...</div>
+    </div>
+
+    <div class="result-box" id="avResult">
+      <div class="stat-line" id="avStat"></div>
+      <div id="avPlayerWrap"></div>
+      <div style="margin-top:12px">
+        <a class="btn-download" id="avDownload" download>⬇️ 下载转换后的文件</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 面板 2：图片转换 ================= -->
+  <section class="panel" id="imgPanel">
     <div class="dropzone" id="imgDrop">
       <div class="dropzone-icon">🖼️</div>
       <div class="dropzone-title" id="imgFileName">点击选择图片，或将图片拖拽到这里</div>
-      <div class="dropzone-sub">支持 JPG / PNG / WebP / BMP / GIF 等常见格式</div>
+      <div class="dropzone-sub">支持 JPG / PNG / WebP / BMP / ICO / GIF 等常见格式</div>
       <input type="file" id="imgInput" accept="image/*" hidden>
     </div>
 
@@ -160,25 +199,24 @@ body{
       <div class="field">
         <label>目标格式</label>
         <select id="imgFormat">
-          <option value="image/webp">WebP（体积最小 · 推荐网页使用）</option>
+          <option value="image/png">PNG（100% 像素级真无损 · 保留透明通道）</option>
+          <option value="image/webp">WebP（高画质现代格式 · 体积小）</option>
           <option value="image/jpeg">JPG（通用兼容性最好）</option>
-          <option value="image/png">PNG（保留透明背景）</option>
         </select>
       </div>
       <div class="field">
-        <label>最大尺寸限制（等比例缩放）</label>
+        <label>分辨率设置</label>
         <select id="imgMaxWidth">
-          <option value="0">保持原始分辨率</option>
+          <option value="0">保持 100% 原始分辨率（无损推荐）</option>
           <option value="1920">最大宽度 1920px（高清屏）</option>
           <option value="1280">最大宽度 1280px（适合博客/社交）</option>
-          <option value="800">最大宽度 800px（轻量缩略图）</option>
         </select>
       </div>
       <div class="field">
-        <label>压缩画质（PNG 格式忽略此项）</label>
+        <label>输出画质（PNG 恒为 100% 无损）</label>
         <div class="range-row">
-          <input type="range" id="imgQuality" min="10" max="100" value="85">
-          <span class="range-val" id="imgQualityVal">85%</span>
+          <input type="range" id="imgQuality" min="50" max="100" value="100">
+          <span class="range-val" id="imgQualityVal">100%</span>
         </div>
       </div>
     </div>
@@ -195,55 +233,8 @@ body{
       </div>
     </div>
   </section>
-
-  <!-- ================= 面板 2：音视频转换 ================= -->
-  <section class="panel" id="avPanel">
-    <div class="dropzone" id="avDrop">
-      <div class="dropzone-icon">🎬</div>
-      <div class="dropzone-title" id="avFileName">点击选择视频或音频，或拖拽到这里</div>
-      <div class="dropzone-sub">支持 MP4 / MKV / MOV / WebM / MP3 / WAV / M4A / OGG（建议 500MB 以内）</div>
-      <input type="file" id="avInput" accept="video/*,audio/*" hidden>
-    </div>
-
-    <div class="controls">
-      <div class="field">
-        <label>目标格式</label>
-        <select id="avFormat">
-          <optgroup label="音频格式（支持从视频中直接提取声音）">
-            <option value="mp3">MP3 音频（通用标准 · 192kbps）</option>
-            <option value="m4a">M4A 音频（AAC 高音质）</option>
-            <option value="wav">WAV 无损音频</option>
-            <option value="ogg">OGG 音频</option>
-          </optgroup>
-          <optgroup label="视频与动图格式">
-            <option value="mp4">MP4 视频（H.264 通用兼容压缩）</option>
-            <option value="webm">WebM 视频（网页轻量格式）</option>
-            <option value="gif">GIF 动图（自动缩放至 480p · 10fps）</option>
-          </optgroup>
-        </select>
-      </div>
-    </div>
-
-    <div class="actions">
-      <button type="button" class="btn-primary" id="avConvertBtn" disabled>开始本地转码</button>
-    </div>
-
-    <div class="progress-wrap" id="avProgressWrap">
-      <div class="progress-bar"><div class="progress-fill" id="avProgressFill"></div></div>
-      <div class="progress-text" id="avProgressText">准备中...</div>
-    </div>
-
-    <div class="result-box" id="avResult">
-      <div class="stat-line" id="avStat"></div>
-      <div id="avPlayerWrap"></div>
-      <div style="margin-top:12px">
-        <a class="btn-download" id="avDownload" download>⬇️ 下载转换后的文件</a>
-      </div>
-    </div>
-  </section>
 </div>
 
-<!-- 引入单线程版 ffmpeg.wasm（无需服务器特殊响应头，纯前端兼容所有静态托管） -->
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script>
 const formatBytes = bytes => {
@@ -252,7 +243,7 @@ const formatBytes = bytes => {
   return (bytes / (1024 * 1024)).toFixed(2) + " MB";
 };
 
-/* ============ Tab 切换 ============ */
+/* Tab 切换 */
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -262,7 +253,6 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
   };
 });
 
-/* 通用拖拽绑定 */
 function bindDropzone(dropEl, inputEl, onFile) {
   dropEl.onclick = () => inputEl.click();
   inputEl.onchange = () => { if (inputEl.files[0]) onFile(inputEl.files[0]); };
@@ -275,7 +265,163 @@ function bindDropzone(dropEl, inputEl, onFile) {
   };
 }
 
-/* ============ 1. 图片转换与压缩（原生 Canvas） ============ */
+/* ============ 1. 音视频无损转换 ============ */
+let currentAvFile = null;
+let lastAvUrl = null;
+let ffmpegInstance = null;
+
+bindDropzone(document.getElementById("avDrop"), document.getElementById("avInput"), file => {
+  if (file.size > 600 * 1024 * 1024) {
+    alert("提示：文件超过 600MB，若选择重编码模式可能导致浏览器内存不足，建议使用「原画质无损直转」。");
+  }
+  currentAvFile = file;
+  document.getElementById("avFileName").textContent = `已选择：${file.name} (${formatBytes(file.size)})`;
+  document.getElementById("avConvertBtn").disabled = false;
+  document.getElementById("avResult").classList.remove("show");
+});
+
+document.getElementById("avConvertBtn").onclick = async () => {
+  if (!currentAvFile) return;
+  const btn = document.getElementById("avConvertBtn");
+  const progWrap = document.getElementById("avProgressWrap");
+  const progFill = document.getElementById("avProgressFill");
+  const progText = document.getElementById("avProgressText");
+  const mode = document.getElementById("avFormat").value;
+
+  btn.disabled = true;
+  progWrap.classList.add("show");
+  progFill.style.width = "8%";
+  document.getElementById("avResult").classList.remove("show");
+
+  try {
+    if (!ffmpegInstance) {
+      progText.textContent = "首次使用正在加载本地无损引擎（约 25MB，加载后浏览器会永久缓存）...";
+      const { createFFmpeg } = FFmpeg;
+      ffmpegInstance = createFFmpeg({
+        log: false,
+        corePath: "https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js"
+      });
+      ffmpegInstance.setProgress(({ ratio }) => {
+        if (ratio >= 0 && ratio <= 1) {
+          const pct = Math.max(12, Math.round(ratio * 100));
+          progFill.style.width = pct + "%";
+          progText.textContent = `正在本地处理中... ${pct}%（请勿关闭页面）`;
+        }
+      });
+      await ffmpegInstance.load();
+    }
+
+    progText.textContent = "正在读取文件...";
+    const inExt = (currentAvFile.name.split(".").pop() || "avi").toLowerCase();
+    const inName = `input.${inExt}`;
+    const buf = await currentAvFile.arrayBuffer();
+    ffmpegInstance.FS("writeFile", inName, new Uint8Array(buf));
+
+    let outExt = "mp4";
+    let modeNote = "";
+
+    if (mode === "mp4_copy") {
+      outExt = "mp4";
+      progText.textContent = "正在执行原画质无损流复制...";
+      try {
+        await ffmpegInstance.run("-i", inName, "-c", "copy", "-movflags", "+faststart", "output.mp4");
+        // 检查输出文件是否有效（部分不兼容 AVI 流复制会生成 0 字节文件）
+        const check = ffmpegInstance.FS("readFile", "output.mp4");
+        if (!check || check.byteLength < 1024) throw new Error("Fallback needed");
+        modeNote = "原画质无损直转 (0 损失)";
+      } catch (e) {
+        // 自动兜底：老式 AVI 编码无法直接封装进 MP4 时，启用母带级 CRF 16 重编码
+        progText.textContent = "检测到老式封装编码，自动切换为母带级无损感重编码（CRF 16）...";
+        await ffmpegInstance.run(
+          "-i", inName,
+          "-c:v", "libx264", "-crf", "16", "-preset", "fast", "-pix_fmt", "yuv420p",
+          "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart",
+          "output.mp4"
+        );
+        modeNote = "母带级高画质编码 (CRF 16 · 兼容老式 AVI)";
+      }
+    } else if (mode === "mp4_hq") {
+      outExt = "mp4";
+      await ffmpegInstance.run(
+        "-i", inName,
+        "-c:v", "libx264", "-crf", "16", "-preset", "fast", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart",
+        "output.mp4"
+      );
+      modeNote = "母带级无损感编码 (CRF 16 · 320k 音频)";
+    } else if (mode === "mkv_copy") {
+      outExt = "mkv";
+      await ffmpegInstance.run("-i", inName, "-c", "copy", "output.mkv");
+      modeNote = "MKV 原画质无损封装 (0 损失)";
+    } else if (mode === "flac") {
+      outExt = "flac";
+      await ffmpegInstance.run("-i", inName, "-vn", "-c:a", "flac", "output.flac");
+      modeNote = "FLAC 真无损音频";
+    } else if (mode === "wav") {
+      outExt = "wav";
+      await ffmpegInstance.run("-i", inName, "-vn", "-c:a", "pcm_s16le", "output.wav");
+      modeNote = "WAV 原始 PCM 真无损音频";
+    } else if (mode === "mp3") {
+      outExt = "mp3";
+      await ffmpegInstance.run("-i", inName, "-vn", "-c:a", "libmp3lame", "-b:a", "320k", "output.mp3");
+      modeNote = "MP3 最高规格 320kbps";
+    } else if (mode === "m4a") {
+      outExt = "m4a";
+      await ffmpegInstance.run("-i", inName, "-vn", "-c:a", "aac", "-b:a", "320k", "output.m4a");
+      modeNote = "M4A 最高规格 320kbps";
+    } else if (mode === "webm") {
+      outExt = "webm";
+      await ffmpegInstance.run("-i", inName, "-c:v", "libvpx", "-crf", "8", "-b:v", "2M", "-c:a", "libvorbis", "-q:a", "6", "output.webm");
+      modeNote = "WebM 高画质编码";
+    } else if (mode === "gif") {
+      outExt = "gif";
+      await ffmpegInstance.run("-i", inName, "-vf", "fps=12,scale=480:-1:flags=lanczos", "output.gif");
+      modeNote = "高清 GIF 动图";
+    }
+
+    const outName = `output.${outExt}`;
+    const data = ffmpegInstance.FS("readFile", outName);
+    try { ffmpegInstance.FS("unlink", inName); ffmpegInstance.FS("unlink", outName); } catch (e) {}
+
+    const mimeMap = {
+      mp4: "video/mp4", mkv: "video/x-matroska", webm: "video/webm", gif: "image/gif",
+      flac: "audio/flac", wav: "audio/wav", mp3: "audio/mpeg", m4a: "audio/mp4"
+    };
+    const blob = new Blob([data.buffer], { type: mimeMap[outExt] || "application/octet-stream" });
+    if (lastAvUrl) URL.revokeObjectURL(lastAvUrl);
+    lastAvUrl = URL.createObjectURL(blob);
+
+    const baseName = currentAvFile.name.replace(/\.[^.]+$/, "");
+    document.getElementById("avStat").innerHTML =
+      `原始：<b>${formatBytes(currentAvFile.size)}</b> → 转换后：<b>${formatBytes(blob.size)}</b> <span class="badge-save">${modeNote}</span>`;
+
+    const playerWrap = document.getElementById("avPlayerWrap");
+    if (["flac", "wav", "mp3", "m4a"].includes(outExt)) {
+      playerWrap.innerHTML = `<audio class="preview-media" controls src="${lastAvUrl}"></audio>`;
+    } else if (outExt === "gif") {
+      playerWrap.innerHTML = `<img class="preview-img" src="${lastAvUrl}" alt="GIF预览">`;
+    } else if (outExt === "mkv") {
+      playerWrap.innerHTML = `<div style="font-size:12.5px;color:var(--ink-soft);margin:8px 0">MKV 封装已完成，请点击下方按钮下载后使用本地播放器观看</div>`;
+    } else {
+      playerWrap.innerHTML = `<video class="preview-media" controls src="${lastAvUrl}"></video>`;
+    }
+
+    const dl = document.getElementById("avDownload");
+    dl.href = lastAvUrl;
+    dl.download = `${baseName}.${outExt}`;
+
+    progFill.style.width = "100%";
+    progText.textContent = "转换完成！";
+    document.getElementById("avResult").classList.add("show");
+  } catch (err) {
+    alert("转换失败：" + err.message);
+    progText.textContent = "转换出错，请确认文件未损坏。";
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+/* ============ 2. 图片无损转换 ============ */
 let currentImgFile = null;
 let lastImgUrl = null;
 const imgQuality = document.getElementById("imgQuality");
@@ -293,7 +439,7 @@ document.getElementById("imgConvertBtn").onclick = () => {
   const mime = document.getElementById("imgFormat").value;
   const maxW = Number(document.getElementById("imgMaxWidth").value);
   const quality = Number(imgQuality.value) / 100;
-  const extMap = { "image/webp": "webp", "image/jpeg": "jpg", "image/png": "png" };
+  const extMap = { "image/png": "png", "image/webp": "webp", "image/jpeg": "jpg" };
 
   const reader = new FileReader();
   reader.onload = e => {
@@ -321,13 +467,12 @@ document.getElementById("imgConvertBtn").onclick = () => {
 
         const baseName = currentImgFile.name.replace(/\.[^.]+$/, "");
         const outName = `${baseName}.${extMap[mime]}`;
-        const diff = ((1 - blob.size / currentImgFile.size) * 100).toFixed(1);
-        const badge = diff > 0
-          ? `<span class="badge-save">体积减小 ${diff}%</span>`
-          : `<span class="badge-save" style="background:#fff3e0;color:#e65100">体积变化 +${Math.abs(diff)}%</span>`;
+        const tag = mime === "image/png" && maxW === 0
+          ? `<span class="badge-save">100% 像素级真无损</span>`
+          : `<span class="badge-save">画质 ${imgQuality.value}%</span>`;
 
         document.getElementById("imgStat").innerHTML =
-          `原始：<b>${formatBytes(currentImgFile.size)}</b> → 转换后：<b>${formatBytes(blob.size)}</b> (${w}×${h}) ${badge}`;
+          `原始：<b>${formatBytes(currentImgFile.size)}</b> → 转换后：<b>${formatBytes(blob.size)}</b> (${w}×${h}) ${tag}`;
         document.getElementById("imgPreview").src = lastImgUrl;
         const dl = document.getElementById("imgDownload");
         dl.href = lastImgUrl;
@@ -338,120 +483,6 @@ document.getElementById("imgConvertBtn").onclick = () => {
     img.src = e.target.result;
   };
   reader.readAsDataURL(currentImgFile);
-};
-
-/* ============ 2. 音视频转换（FFmpeg.wasm 单线程） ============ */
-let currentAvFile = null;
-let lastAvUrl = null;
-let ffmpegInstance = null;
-
-bindDropzone(document.getElementById("avDrop"), document.getElementById("avInput"), file => {
-  if (file.size > 500 * 1024 * 1024) {
-    alert("提示：该文件超过 500MB，浏览器内存可能不足，建议选择 500MB 以内的文件。");
-  }
-  currentAvFile = file;
-  document.getElementById("avFileName").textContent = `已选择：${file.name} (${formatBytes(file.size)})`;
-  document.getElementById("avConvertBtn").disabled = false;
-  document.getElementById("avResult").classList.remove("show");
-});
-
-document.getElementById("avConvertBtn").onclick = async () => {
-  if (!currentAvFile) return;
-  const btn = document.getElementById("avConvertBtn");
-  const progWrap = document.getElementById("avProgressWrap");
-  const progFill = document.getElementById("avProgressFill");
-  const progText = document.getElementById("avProgressText");
-  const targetExt = document.getElementById("avFormat").value;
-
-  btn.disabled = true;
-  progWrap.classList.add("show");
-  progFill.style.width = "5%";
-  document.getElementById("avResult").classList.remove("show");
-
-  try {
-    if (!ffmpegInstance) {
-      progText.textContent = "首次使用正在加载本地转码引擎（约 25MB，加载后浏览器会自动缓存）...";
-      const { createFFmpeg } = FFmpeg;
-      ffmpegInstance = createFFmpeg({
-        log: false,
-        corePath: "https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js"
-      });
-      ffmpegInstance.setProgress(({ ratio }) => {
-        if (ratio >= 0 && ratio <= 1) {
-          const pct = Math.max(10, Math.round(ratio * 100));
-          progFill.style.width = pct + "%";
-          progText.textContent = `正在本地转码中... ${pct}%（请勿关闭页面）`;
-        }
-      });
-      await ffmpegInstance.load();
-    }
-
-    progText.textContent = "正在读取文件到内存...";
-    const inExt = (currentAvFile.name.split(".").pop() || "mp4").toLowerCase();
-    const inName = `input.${inExt}`;
-    const outName = `output.${targetExt}`;
-
-    const buf = await currentAvFile.arrayBuffer();
-    ffmpegInstance.FS("writeFile", inName, new Uint8Array(buf));
-
-    // 针对不同输出格式配置高效参数
-    let args = ["-i", inName];
-    if (targetExt === "mp3") {
-      args.push("-vn", "-acodec", "libmp3lame", "-b:a", "192k", outName);
-    } else if (targetExt === "m4a") {
-      args.push("-vn", "-c:a", "aac", "-b:a", "192k", outName);
-    } else if (targetExt === "wav") {
-      args.push("-vn", outName);
-    } else if (targetExt === "ogg") {
-      args.push("-vn", "-c:a", "libvorbis", "-q:a", "4", outName);
-    } else if (targetExt === "mp4") {
-      args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "26", "-c:a", "aac", "-b:a", "128k", outName);
-    } else if (targetExt === "webm") {
-      args.push("-c:v", "libvpx", "-crf", "12", "-b:v", "1M", "-c:a", "libvorbis", outName);
-    } else if (targetExt === "gif") {
-      args.push("-vf", "fps=10,scale=480:-1:flags=lanczos", outName);
-    }
-
-    await ffmpegInstance.run(...args);
-
-    const data = ffmpegInstance.FS("readFile", outName);
-    // 清理虚拟内存中的临时文件
-    try { ffmpegInstance.FS("unlink", inName); ffmpegInstance.FS("unlink", outName); } catch (e) {}
-
-    const mimeMap = {
-      mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav", ogg: "audio/ogg",
-      mp4: "video/mp4", webm: "video/webm", gif: "image/gif"
-    };
-    const blob = new Blob([data.buffer], { type: mimeMap[targetExt] || "application/octet-stream" });
-    if (lastAvUrl) URL.revokeObjectURL(lastAvUrl);
-    lastAvUrl = URL.createObjectURL(blob);
-
-    const baseName = currentAvFile.name.replace(/\.[^.]+$/, "");
-    document.getElementById("avStat").innerHTML =
-      `原始：<b>${formatBytes(currentAvFile.size)}</b> → 转换后：<b>${formatBytes(blob.size)}</b>`;
-
-    const playerWrap = document.getElementById("avPlayerWrap");
-    if (["mp3", "m4a", "wav", "ogg"].includes(targetExt)) {
-      playerWrap.innerHTML = `<audio class="preview-media" controls src="${lastAvUrl}"></audio>`;
-    } else if (targetExt === "gif") {
-      playerWrap.innerHTML = `<img class="preview-img" src="${lastAvUrl}" alt="GIF预览">`;
-    } else {
-      playerWrap.innerHTML = `<video class="preview-media" controls src="${lastAvUrl}"></video>`;
-    }
-
-    const dl = document.getElementById("avDownload");
-    dl.href = lastAvUrl;
-    dl.download = `${baseName}.${targetExt}`;
-
-    progFill.style.width = "100%";
-    progText.textContent = "转换完成！";
-    document.getElementById("avResult").classList.add("show");
-  } catch (err) {
-    alert("转码过程中出错：" + err.message);
-    progText.textContent = "转换失败，请检查文件是否损坏或体积过大。";
-  } finally {
-    btn.disabled = false;
-  }
 };
 </script>
 </body>
