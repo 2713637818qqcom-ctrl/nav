@@ -154,7 +154,7 @@ body{
             <option value="webm">WebM · 高画质网页视频</option>
             <option value="gif">GIF · 高清动图（480p · 12fps）</option>
           </optgroup>
-          <optgroup label="实况照片 / 动态照片（默认截取前 3～5 秒）">
+          <optgroup label="实况照片 / 动态照片（默认截取前 3 秒）">
             <option value="live_ios">iOS 实况照片（生成配对 JPG + MOV · 苹果专用）</option>
             <option value="live_android">安卓动态照片（生成单张动态 JPG · 小米/OV/荣耀等）</option>
           </optgroup>
@@ -283,8 +283,8 @@ function generateUUID() {
 /* 写入 iOS Live Photo 配对 UUID 到 JPG EXIF MakerNote */
 function injectAppleLivePhotoExif(jpegBytes, uuid) {
   const enc = new TextEncoder();
-  const uuidBytes = enc.encode(uuid + " ");
-  const mnHeader = enc.encode("Apple iOS ");
+  const uuidBytes = enc.encode(uuid + "\0");
+  const mnHeader = enc.encode("Apple iOS\0");
   const mnLen = 28 + uuidBytes.length;
   const tiffLen = 8 + 18 + 18 + mnLen;
   const app1PayloadLen = 2 + 6 + tiffLen;
@@ -294,7 +294,7 @@ function injectAppleLivePhotoExif(jpegBytes, uuid) {
   let p = 0;
   app1[p++] = 0xFF; app1[p++] = 0xE1;
   view.setUint16(p, app1PayloadLen); p += 2;
-  app1.set(enc.encode("Exif  "), p); p += 6;
+  app1.set(enc.encode("Exif\0\0"), p); p += 6;
 
   // TIFF Header (Big Endian)
   app1[p++] = 0x4D; app1[p++] = 0x4D;
@@ -335,10 +335,11 @@ function injectAppleLivePhotoExif(jpegBytes, uuid) {
   return out;
 }
 
+/* 写入安卓 Motion Photo XMP 并将 MP4 封装进 JPG 尾部 */
 /* 写入安卓双协议 Motion Photo XMP（兼容旧版 MicroVideo 与新版 Android 11+ 相册） */
 function buildAndroidMotionPhoto(jpegBytes, mp4Bytes) {
   const enc = new TextEncoder();
-  const xmpHeader = enc.encode("http://ns.adobe.com/xap/1.0/ ");
+  const xmpHeader = enc.encode("http://ns.adobe.com/xap/1.0/\0");
   const xmpXml = enc.encode(
     `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>` +
     `<x:xmpmeta xmlns:x="adobe:ns:meta/">` +
@@ -461,6 +462,7 @@ function extractCoverJpeg(file, inputUint8, inName) {
     };
   }).then(async nativeJpg => {
     if (nativeJpg && nativeJpg.byteLength > 100) return nativeJpg;
+    // 浏览器原生无法解码（如 H.265/HEVC、AVI、MKV），自动调用 FFmpeg 提取首帧
     return await runSingleFFmpeg(
       inputUint8, inName,
       ["-i", inName, "-vframes", "1", "-q:v", "2", "cover.jpg"],
@@ -527,7 +529,7 @@ document.getElementById("avConvertBtn").onclick = async () => {
       progText.textContent = "正在提取高清封面帧（自动兼容 H.265 / AVI / MOV）...";
       const rawJpg = await extractCoverJpeg(currentAvFile, inputUint8, inName);
 
-      progText.textContent = "正在生成实况动态视频流...";
+      progText.textContent = "正在生成 3 秒实况动态视频流...";
       if (mode === "live_ios") {
         const uuid = generateUUID();
         const rawMov = await runSingleFFmpeg(
@@ -561,9 +563,8 @@ document.getElementById("avConvertBtn").onclick = async () => {
         const rawMp4 = await runSingleFFmpeg(
           inputUint8, inName,
           [
-            "-i", inName, "-t", "5",
-            "-c:v", "libx264", "-profile:v", "main", "-bf", "0",
-            "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "20",
+            "-i", inName, "-t", "3",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "20",
             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
             "motion.mp4"
           ],
@@ -574,7 +575,7 @@ document.getElementById("avConvertBtn").onclick = async () => {
         const finalUrl = trackUrl(URL.createObjectURL(new Blob([motionJpg], { type: "image/jpeg" })));
 
         document.getElementById("avStat").innerHTML =
-          `安卓动态照片已合成：<b>${formatBytes(motionJpg.byteLength)}</b> <span class="badge-save">XMP MotionPhoto · 无 B 帧兼容</span>`;
+          `安卓动态照片已合成：<b>${formatBytes(motionJpg.byteLength)}</b> <span class="badge-save">XMP MotionPhoto</span>`;
         document.getElementById("avPlayerWrap").innerHTML = `<img class="preview-img" src="${finalUrl}" alt="动态照片封面预览">`;
         const dl = document.getElementById("avDownload");
         dl.style.display = "inline-flex";
