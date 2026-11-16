@@ -235,7 +235,7 @@ body{
   </section>
 </div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.0/dist/ffmpeg.min.js"></script>
 <script>
 const formatBytes = bytes => {
   if (bytes < 1024) return bytes + " B";
@@ -299,7 +299,7 @@ document.getElementById("avConvertBtn").onclick = async () => {
       const { createFFmpeg } = FFmpeg;
       ffmpegInstance = createFFmpeg({
         log: false,
-        corePath: "https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js"
+        corePath: "https://unpkg.com/@ffmpeg/core-st@0.11.0/dist/ffmpeg-core.js"
       });
       ffmpegInstance.setProgress(({ ratio }) => {
         if (ratio >= 0 && ratio <= 1) {
@@ -414,6 +414,7 @@ document.getElementById("avConvertBtn").onclick = async () => {
     progText.textContent = "转换完成！";
     document.getElementById("avResult").classList.add("show");
   } catch (err) {
+    ffmpegInstance = null;
     alert("转换失败：" + err.message);
     progText.textContent = "转换出错，请确认文件未损坏。";
   } finally {
