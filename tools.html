@@ -365,10 +365,78 @@ function buildAndroidMotionPhoto(jpegBytes, mp4Bytes) {
   return out;
 }
 
+/* 原生浏览器直接提取高清封面 JPG（避免重复调用 FFmpeg 触发单线程 exit(0)） */
+function extractCoverJpeg(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(0.1, (video.duration || 1) / 2);
+    };
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(async blob => {
+          URL.revokeObjectURL(url);
+          if (!blob) return reject(new Error("无法提取视频封面帧"));
+          resolve(new Uint8Array(await blob.arrayBuffer()));
+        }, "image/jpeg", 0.95);
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        reject(e);
+      }
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("浏览器无法解码该视频封面，请先转为标准 MP4"));
+    };
+  });
+}
+
+/* 单线程 FFmpeg 安全执行器（自动处理 exit(0) 正常退出信号并防止二次调用崩溃） */
+let engineLoadedOnce = false;
+async function runSingleFFmpeg(inputUint8, inName, args, outName, onProgress) {
+  const { createFFmpeg } = FFmpeg;
+  const ff = createFFmpeg({
+    log: false,
+    mainName: "main",
+    corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js"
+  });
+  if (onProgress) {
+    ff.setProgress(({ ratio }) => {
+      if (ratio >= 0 && ratio <= 1) onProgress(ratio);
+    });
+  }
+  await ff.load();
+  engineLoadedOnce = true;
+
+  ff.FS("writeFile", inName, inputUint8);
+  try {
+    await ff.run(...args);
+  } catch (err) {
+    const msg = String((err && err.message) || err || "");
+    // 单线程 core-st 在 main 结束时会抛出 exit(0)，属于正常完成信号
+    if (!(err && err.status === 0) && !msg.includes("exit(0)")) {
+      throw err;
+    }
+  }
+  const result = ff.FS("readFile", outName);
+  try { ff.FS("unlink", inName); ff.FS("unlink", outName); } catch (e) {}
+  return result;
+}
+
 /* ============ 1. 音视频与实况转换 ============ */
 let currentAvFile = null;
 let activeBlobUrls = [];
-let ffmpegInstance = null;
 
 function trackUrl(url) {
   activeBlobUrls.push(url);
@@ -403,50 +471,42 @@ document.getElementById("avConvertBtn").onclick = async () => {
   document.getElementById("avResult").classList.remove("show");
   clearTrackedUrls();
 
-  try {
-    if (!ffmpegInstance) {
-      progText.textContent = "首次使用正在加载本地无损引擎（约 25MB，加载后浏览器会永久缓存）...";
-      const { createFFmpeg } = FFmpeg;
-      ffmpegInstance = createFFmpeg({
-        log: false,
-        mainName: "main",
-        corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js"
-      });
-      ffmpegInstance.setProgress(({ ratio }) => {
-        if (ratio >= 0 && ratio <= 1) {
-          const pct = Math.max(12, Math.round(ratio * 100));
-          progFill.style.width = pct + "%";
-          progText.textContent = `正在本地处理中... ${pct}%（请勿关闭页面）`;
-        }
-      });
-      await ffmpegInstance.load();
-    }
+  const updateProgress = ratio => {
+    const pct = Math.max(12, Math.round(ratio * 100));
+    progFill.style.width = pct + "%";
+    progText.textContent = `正在本地处理中... ${pct}%（请勿关闭页面）`;
+  };
 
-    progText.textContent = "正在读取文件...";
+  try {
+    progText.textContent = engineLoadedOnce
+      ? "正在初始化本地转码环境并读取文件..."
+      : "首次使用正在加载本地无损引擎（约 25MB，加载后浏览器会永久缓存）...";
+
     const inExt = (currentAvFile.name.split(".").pop() || "mp4").toLowerCase();
     const inName = `input.${inExt}`;
-    const buf = await currentAvFile.arrayBuffer();
-    ffmpegInstance.FS("writeFile", inName, new Uint8Array(buf));
-
+    const inputUint8 = new Uint8Array(await currentAvFile.arrayBuffer());
     const baseName = currentAvFile.name.replace(/\.[^.]+$/, "");
 
     /* --- 分支 A：实况照片 / 动态照片 --- */
     if (mode === "live_ios" || mode === "live_android") {
-      progText.textContent = "正在提取高清封面帧与 3 秒动态视频流...";
-      await ffmpegInstance.run("-i", inName, "-ss", "00:00:00.1", "-vframes", "1", "-q:v", "2", "cover.jpg");
-      const rawJpg = ffmpegInstance.FS("readFile", "cover.jpg");
+      progText.textContent = "正在提取高清封面帧与生成 3 秒实况视频流...";
+      const rawJpg = await extractCoverJpeg(currentAvFile);
 
       if (mode === "live_ios") {
         const uuid = generateUUID();
-        await ffmpegInstance.run(
-          "-i", inName, "-t", "3",
-          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "18",
-          "-c:a", "aac", "-b:a", "192k",
-          "-movflags", "use_metadata_tags+faststart",
-          "-metadata", `com.apple.quicktime.content.identifier=${uuid}`,
-          "live.mov"
+        const rawMov = await runSingleFFmpeg(
+          inputUint8, inName,
+          [
+            "-i", inName, "-t", "3",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "use_metadata_tags+faststart",
+            "-metadata", `com.apple.quicktime.content.identifier=${uuid}`,
+            "live.mov"
+          ],
+          "live.mov",
+          updateProgress
         );
-        const rawMov = ffmpegInstance.FS("readFile", "live.mov");
         const pairedJpg = injectAppleLivePhotoExif(rawJpg, uuid);
 
         const jpgUrl = trackUrl(URL.createObjectURL(new Blob([pairedJpg], { type: "image/jpeg" })));
@@ -462,13 +522,17 @@ document.getElementById("avConvertBtn").onclick = async () => {
            </div>`;
         document.getElementById("avDownload").style.display = "none";
       } else {
-        await ffmpegInstance.run(
-          "-i", inName, "-t", "3",
-          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "20",
-          "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
-          "motion.mp4"
+        const rawMp4 = await runSingleFFmpeg(
+          inputUint8, inName,
+          [
+            "-i", inName, "-t", "3",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "20",
+            "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+            "motion.mp4"
+          ],
+          "motion.mp4",
+          updateProgress
         );
-        const rawMp4 = ffmpegInstance.FS("readFile", "motion.mp4");
         const motionJpg = buildAndroidMotionPhoto(rawJpg, rawMp4);
         const finalUrl = trackUrl(URL.createObjectURL(new Blob([motionJpg], { type: "image/jpeg" })));
 
@@ -481,13 +545,6 @@ document.getElementById("avConvertBtn").onclick = async () => {
         dl.download = `MVIMG_${baseName}.jpg`;
       }
 
-      try {
-        ffmpegInstance.FS("unlink", inName);
-        ffmpegInstance.FS("unlink", "cover.jpg");
-        ffmpegInstance.FS("unlink", "live.mov");
-        ffmpegInstance.FS("unlink", "motion.mp4");
-      } catch (e) {}
-
       progFill.style.width = "100%";
       progText.textContent = "实况转换完成！";
       document.getElementById("avResult").classList.add("show");
@@ -497,67 +554,78 @@ document.getElementById("avConvertBtn").onclick = async () => {
     /* --- 分支 B：常规无损音视频转换 --- */
     let outExt = "mp4";
     let modeNote = "";
+    let data = null;
 
     if (mode === "mp4_copy") {
       outExt = "mp4";
       progText.textContent = "正在执行原画质无损流复制...";
       try {
-        await ffmpegInstance.run("-i", inName, "-c", "copy", "-movflags", "+faststart", "output.mp4");
-        const check = ffmpegInstance.FS("readFile", "output.mp4");
-        if (!check || check.byteLength < 1024) throw new Error("Fallback needed");
+        data = await runSingleFFmpeg(
+          inputUint8, inName,
+          ["-i", inName, "-c", "copy", "-movflags", "+faststart", "output.mp4"],
+          "output.mp4",
+          updateProgress
+        );
+        if (!data || data.byteLength < 1024) throw new Error("Fallback needed");
         modeNote = "原画质无损直转 (0 损失)";
       } catch (e) {
         progText.textContent = "检测到老式封装编码，自动切换为母带级无损感重编码（CRF 16）...";
-        await ffmpegInstance.run(
-          "-i", inName,
-          "-c:v", "libx264", "-crf", "16", "-preset", "fast", "-pix_fmt", "yuv420p",
-          "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart",
-          "output.mp4"
+        data = await runSingleFFmpeg(
+          inputUint8, inName,
+          [
+            "-i", inName,
+            "-c:v", "libx264", "-crf", "16", "-preset", "fast", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart",
+            "output.mp4"
+          ],
+          "output.mp4",
+          updateProgress
         );
         modeNote = "母带级高画质编码 (CRF 16 · 兼容老式 AVI)";
       }
     } else if (mode === "mp4_hq") {
       outExt = "mp4";
-      await ffmpegInstance.run(
-        "-i", inName,
-        "-c:v", "libx264", "-crf", "16", "-preset", "fast", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart",
-        "output.mp4"
+      data = await runSingleFFmpeg(
+        inputUint8, inName,
+        [
+          "-i", inName,
+          "-c:v", "libx264", "-crf", "16", "-preset", "fast", "-pix_fmt", "yuv420p",
+          "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart",
+          "output.mp4"
+        ],
+        "output.mp4",
+        updateProgress
       );
       modeNote = "母带级无损感编码 (CRF 16 · 320k 音频)";
     } else if (mode === "mkv_copy") {
       outExt = "mkv";
-      await ffmpegInstance.run("-i", inName, "-c", "copy", "output.mkv");
+      data = await runSingleFFmpeg(inputUint8, inName, ["-i", inName, "-c", "copy", "output.mkv"], "output.mkv", updateProgress);
       modeNote = "MKV 原画质无损封装 (0 损失)";
     } else if (mode === "flac") {
       outExt = "flac";
-      await ffmpegInstance.run("-i", inName, "-vn", "-c:a", "flac", "output.flac");
+      data = await runSingleFFmpeg(inputUint8, inName, ["-i", inName, "-vn", "-c:a", "flac", "output.flac"], "output.flac", updateProgress);
       modeNote = "FLAC 真无损音频";
     } else if (mode === "wav") {
       outExt = "wav";
-      await ffmpegInstance.run("-i", inName, "-vn", "-c:a", "pcm_s16le", "output.wav");
+      data = await runSingleFFmpeg(inputUint8, inName, ["-i", inName, "-vn", "-c:a", "pcm_s16le", "output.wav"], "output.wav", updateProgress);
       modeNote = "WAV 原始 PCM 真无损音频";
     } else if (mode === "mp3") {
       outExt = "mp3";
-      await ffmpegInstance.run("-i", inName, "-vn", "-c:a", "libmp3lame", "-b:a", "320k", "output.mp3");
+      data = await runSingleFFmpeg(inputUint8, inName, ["-i", inName, "-vn", "-c:a", "libmp3lame", "-b:a", "320k", "output.mp3"], "output.mp3", updateProgress);
       modeNote = "MP3 最高规格 320kbps";
     } else if (mode === "m4a") {
       outExt = "m4a";
-      await ffmpegInstance.run("-i", inName, "-vn", "-c:a", "aac", "-b:a", "320k", "output.m4a");
+      data = await runSingleFFmpeg(inputUint8, inName, ["-i", inName, "-vn", "-c:a", "aac", "-b:a", "320k", "output.m4a"], "output.m4a", updateProgress);
       modeNote = "M4A 最高规格 320kbps";
     } else if (mode === "webm") {
       outExt = "webm";
-      await ffmpegInstance.run("-i", inName, "-c:v", "libvpx", "-crf", "8", "-b:v", "2M", "-c:a", "libvorbis", "-q:a", "6", "output.webm");
+      data = await runSingleFFmpeg(inputUint8, inName, ["-i", inName, "-c:v", "libvpx", "-crf", "8", "-b:v", "2M", "-c:a", "libvorbis", "-q:a", "6", "output.webm"], "output.webm", updateProgress);
       modeNote = "WebM 高画质编码";
     } else if (mode === "gif") {
       outExt = "gif";
-      await ffmpegInstance.run("-i", inName, "-vf", "fps=12,scale=480:-1:flags=lanczos", "output.gif");
+      data = await runSingleFFmpeg(inputUint8, inName, ["-i", inName, "-vf", "fps=12,scale=480:-1:flags=lanczos", "output.gif"], "output.gif", updateProgress);
       modeNote = "高清 GIF 动图";
     }
-
-    const outName = `output.${outExt}`;
-    const data = ffmpegInstance.FS("readFile", outName);
-    try { ffmpegInstance.FS("unlink", inName); ffmpegInstance.FS("unlink", outName); } catch (e) {}
 
     const mimeMap = {
       mp4: "video/mp4", mkv: "video/x-matroska", webm: "video/webm", gif: "image/gif",
@@ -588,7 +656,6 @@ document.getElementById("avConvertBtn").onclick = async () => {
     progText.textContent = "转换完成！";
     document.getElementById("avResult").classList.add("show");
   } catch (err) {
-    ffmpegInstance = null;
     alert("转换失败：" + err.message);
     progText.textContent = "转换出错，请确认文件未损坏。";
   } finally {
