@@ -126,15 +126,15 @@ body{
 
   <header class="header">
     <h1>本地无损文件转换器</h1>
-    <p>默认优先采用无损封装与高码率输出 · 支持 AVI / MKV / MOV / FLAC / PNG 等全格式</p>
+    <p>默认优先采用无损封装与高码率输出 · 支持 AVI / MKV / MOV / 实况照片 / FLAC / PNG</p>
   </header>
 
   <div class="tabs">
-    <button type="button" class="tab-btn active" data-tab="avPanel">🎬 音视频无损转换 / 提取</button>
+    <button type="button" class="tab-btn active" data-tab="avPanel">🎬 音视频与实况转换</button>
     <button type="button" class="tab-btn" data-tab="imgPanel">🖼️ 图片无损转换 / 压缩</button>
   </div>
 
-  <!-- ================= 面板 1：音视频转换 ================= -->
+  <!-- ================= 面板 1：音视频与实况转换 ================= -->
   <section class="panel active" id="avPanel">
     <div class="dropzone" id="avDrop">
       <div class="dropzone-icon">🎬</div>
@@ -154,6 +154,10 @@ body{
             <option value="webm">WebM · 高画质网页视频</option>
             <option value="gif">GIF · 高清动图（480p · 12fps）</option>
           </optgroup>
+          <optgroup label="实况照片 / 动态照片（默认截取前 3 秒）">
+            <option value="live_ios">iOS 实况照片（生成配对 JPG + MOV · 苹果专用）</option>
+            <option value="live_android">安卓动态照片（生成单张动态 JPG · 小米/OV/荣耀等）</option>
+          </optgroup>
           <optgroup label="无损与高音质音频提取（可直接从视频提取）">
             <option value="flac">FLAC · 真无损压缩音频（推荐 · 100% 保留原音质）</option>
             <option value="wav">WAV · 原始 PCM 真无损音频</option>
@@ -165,11 +169,11 @@ body{
     </div>
 
     <div class="hint-tip">
-      💡 <b>无损说明</b>：选择「原画质无损直转」时直接复制原始视频流，<b>0 画质损失且 1～2 秒完成</b>；若遇到编码过于古老的 AVI 文件无法直封装进 MP4，系统会自动无缝切换为 CRF 16 视觉无损重编码。
+      💡 <b>使用说明</b>：「原画质无损直转」直接复制原始视频流，<b>0 画质损失且 1～2 秒完成</b>；选择「iOS 实况照片」会导出同名 JPG 与 MOV，在 iPhone「文件」App 中同时选中并点「存储 2 个项目」即可合成为原生 Live Photo。
     </div>
 
     <div class="actions">
-      <button type="button" class="btn-primary" id="avConvertBtn" disabled>开始无损转换</button>
+      <button type="button" class="btn-primary" id="avConvertBtn" disabled>开始转换</button>
     </div>
 
     <div class="progress-wrap" id="avProgressWrap">
@@ -265,10 +269,115 @@ function bindDropzone(dropEl, inputEl, onFile) {
   };
 }
 
-/* ============ 1. 音视频无损转换 ============ */
+/* 生成大写 UUID（兼容非 HTTPS 环境） */
+function generateUUID() {
+  if (window.crypto && crypto.randomUUID) {
+    return crypto.randomUUID().toUpperCase();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+  }).toUpperCase();
+}
+
+/* 写入 iOS Live Photo 配对 UUID 到 JPG EXIF MakerNote */
+function injectAppleLivePhotoExif(jpegBytes, uuid) {
+  const enc = new TextEncoder();
+  const uuidBytes = enc.encode(uuid + "\0");
+  const mnHeader = enc.encode("Apple iOS\0");
+  const mnLen = 28 + uuidBytes.length;
+  const tiffLen = 8 + 18 + 18 + mnLen;
+  const app1PayloadLen = 2 + 6 + tiffLen;
+
+  const app1 = new Uint8Array(2 + app1PayloadLen);
+  const view = new DataView(app1.buffer);
+  let p = 0;
+  app1[p++] = 0xFF; app1[p++] = 0xE1;
+  view.setUint16(p, app1PayloadLen); p += 2;
+  app1.set(enc.encode("Exif\0\0"), p); p += 6;
+
+  // TIFF Header (Big Endian)
+  app1[p++] = 0x4D; app1[p++] = 0x4D;
+  view.setUint16(p, 42); p += 2;
+  view.setUint32(p, 8); p += 4;
+
+  // IFD0 -> ExifIFDPointer (0x8769)
+  view.setUint16(p, 1); p += 2;
+  view.setUint16(p, 0x8769); p += 2;
+  view.setUint16(p, 4); p += 2;
+  view.setUint32(p, 1); p += 4;
+  view.setUint32(p, 26); p += 4;
+  view.setUint32(p, 0); p += 4;
+
+  // ExifIFD -> MakerNote (0x927C)
+  view.setUint16(p, 1); p += 2;
+  view.setUint16(p, 0x927C); p += 2;
+  view.setUint16(p, 7); p += 2;
+  view.setUint32(p, mnLen); p += 4;
+  view.setUint32(p, 44); p += 4;
+  view.setUint32(p, 0); p += 4;
+
+  // Apple MakerNote (Tag 0x0011 = ContentIdentifier)
+  app1.set(mnHeader, p); p += 10;
+  app1[p++] = 0x00; app1[p++] = 0x01;
+  app1[p++] = 0x4D; app1[p++] = 0x4D;
+  view.setUint16(p, 1); p += 2;
+  view.setUint16(p, 0x0011); p += 2;
+  view.setUint16(p, 2); p += 2;
+  view.setUint32(p, uuidBytes.length); p += 4;
+  view.setUint32(p, 28); p += 4;
+  app1.set(uuidBytes, p);
+
+  const out = new Uint8Array(2 + app1.length + (jpegBytes.length - 2));
+  out.set(jpegBytes.slice(0, 2), 0);
+  out.set(app1, 2);
+  out.set(jpegBytes.slice(2), 2 + app1.length);
+  return out;
+}
+
+/* 写入安卓 Motion Photo XMP 并将 MP4 封装进 JPG 尾部 */
+function buildAndroidMotionPhoto(jpegBytes, mp4Bytes) {
+  const enc = new TextEncoder();
+  const xmpHeader = enc.encode("http://ns.adobe.com/xap/1.0/\0");
+  const xmpXml = enc.encode(
+    `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>` +
+    `<x:xmpmeta xmlns:x="adobe:ns:meta/">` +
+    `<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
+    `<rdf:Description rdf:about="" xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" ` +
+    `GCamera:MicroVideo="1" GCamera:MicroVideoVersion="1" ` +
+    `GCamera:MicroVideoOffset="${mp4Bytes.length}" GCamera:MicroVideoPresentationTimestampUs="1500000"/>` +
+    `</rdf:RDF></x:xmpmeta><?xpacket end="w"?>`
+  );
+  const app1PayloadLen = 2 + xmpHeader.length + xmpXml.length;
+  const app1 = new Uint8Array(2 + app1PayloadLen);
+  const view = new DataView(app1.buffer);
+  app1[0] = 0xFF; app1[1] = 0xE1;
+  view.setUint16(2, app1PayloadLen);
+  app1.set(xmpHeader, 4);
+  app1.set(xmpXml, 4 + xmpHeader.length);
+
+  const out = new Uint8Array(2 + app1.length + (jpegBytes.length - 2) + mp4Bytes.length);
+  let offset = 0;
+  out.set(jpegBytes.slice(0, 2), offset); offset += 2;
+  out.set(app1, offset); offset += app1.length;
+  out.set(jpegBytes.slice(2), offset); offset += (jpegBytes.length - 2);
+  out.set(mp4Bytes, offset);
+  return out;
+}
+
+/* ============ 1. 音视频与实况转换 ============ */
 let currentAvFile = null;
-let lastAvUrl = null;
+let activeBlobUrls = [];
 let ffmpegInstance = null;
+
+function trackUrl(url) {
+  activeBlobUrls.push(url);
+  return url;
+}
+function clearTrackedUrls() {
+  activeBlobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
+  activeBlobUrls = [];
+}
 
 bindDropzone(document.getElementById("avDrop"), document.getElementById("avInput"), file => {
   if (file.size > 600 * 1024 * 1024) {
@@ -292,6 +401,7 @@ document.getElementById("avConvertBtn").onclick = async () => {
   progWrap.classList.add("show");
   progFill.style.width = "8%";
   document.getElementById("avResult").classList.remove("show");
+  clearTrackedUrls();
 
   try {
     if (!ffmpegInstance) {
@@ -313,11 +423,78 @@ document.getElementById("avConvertBtn").onclick = async () => {
     }
 
     progText.textContent = "正在读取文件...";
-    const inExt = (currentAvFile.name.split(".").pop() || "avi").toLowerCase();
+    const inExt = (currentAvFile.name.split(".").pop() || "mp4").toLowerCase();
     const inName = `input.${inExt}`;
     const buf = await currentAvFile.arrayBuffer();
     ffmpegInstance.FS("writeFile", inName, new Uint8Array(buf));
 
+    const baseName = currentAvFile.name.replace(/\.[^.]+$/, "");
+
+    /* --- 分支 A：实况照片 / 动态照片 --- */
+    if (mode === "live_ios" || mode === "live_android") {
+      progText.textContent = "正在提取高清封面帧与 3 秒动态视频流...";
+      await ffmpegInstance.run("-i", inName, "-ss", "00:00:00.1", "-vframes", "1", "-q:v", "2", "cover.jpg");
+      const rawJpg = ffmpegInstance.FS("readFile", "cover.jpg");
+
+      if (mode === "live_ios") {
+        const uuid = generateUUID();
+        await ffmpegInstance.run(
+          "-i", inName, "-t", "3",
+          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "18",
+          "-c:a", "aac", "-b:a", "192k",
+          "-movflags", "use_metadata_tags+faststart",
+          "-metadata", `com.apple.quicktime.content.identifier=${uuid}`,
+          "live.mov"
+        );
+        const rawMov = ffmpegInstance.FS("readFile", "live.mov");
+        const pairedJpg = injectAppleLivePhotoExif(rawJpg, uuid);
+
+        const jpgUrl = trackUrl(URL.createObjectURL(new Blob([pairedJpg], { type: "image/jpeg" })));
+        const movUrl = trackUrl(URL.createObjectURL(new Blob([rawMov.buffer], { type: "video/quicktime" })));
+
+        document.getElementById("avStat").innerHTML =
+          `iOS 实况套件已生成 <span class="badge-save">已绑定配对 UUID</span>`;
+        document.getElementById("avPlayerWrap").innerHTML =
+          `<div style="font-size:12.5px;color:var(--ink-soft);margin:8px 0">请<b>同时下载</b>下方两个同名文件到手机，在系统「文件」App 中全选并点「存储 2 个项目」即可自动合成为实况照片：</div>
+           <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+             <a class="btn-download" href="${jpgUrl}" download="${baseName}.JPG">⬇️ 1. 下载实况封面 (${baseName}.JPG)</a>
+             <a class="btn-download" href="${movUrl}" download="${baseName}.MOV">⬇️ 2. 下载实况视频 (${baseName}.MOV)</a>
+           </div>`;
+        document.getElementById("avDownload").style.display = "none";
+      } else {
+        await ffmpegInstance.run(
+          "-i", inName, "-t", "3",
+          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "20",
+          "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+          "motion.mp4"
+        );
+        const rawMp4 = ffmpegInstance.FS("readFile", "motion.mp4");
+        const motionJpg = buildAndroidMotionPhoto(rawJpg, rawMp4);
+        const finalUrl = trackUrl(URL.createObjectURL(new Blob([motionJpg], { type: "image/jpeg" })));
+
+        document.getElementById("avStat").innerHTML =
+          `安卓动态照片已合成：<b>${formatBytes(motionJpg.byteLength)}</b> <span class="badge-save">XMP MotionPhoto</span>`;
+        document.getElementById("avPlayerWrap").innerHTML = `<img class="preview-img" src="${finalUrl}" alt="动态照片封面预览">`;
+        const dl = document.getElementById("avDownload");
+        dl.style.display = "inline-flex";
+        dl.href = finalUrl;
+        dl.download = `MVIMG_${baseName}.jpg`;
+      }
+
+      try {
+        ffmpegInstance.FS("unlink", inName);
+        ffmpegInstance.FS("unlink", "cover.jpg");
+        ffmpegInstance.FS("unlink", "live.mov");
+        ffmpegInstance.FS("unlink", "motion.mp4");
+      } catch (e) {}
+
+      progFill.style.width = "100%";
+      progText.textContent = "实况转换完成！";
+      document.getElementById("avResult").classList.add("show");
+      return;
+    }
+
+    /* --- 分支 B：常规无损音视频转换 --- */
     let outExt = "mp4";
     let modeNote = "";
 
@@ -326,12 +503,10 @@ document.getElementById("avConvertBtn").onclick = async () => {
       progText.textContent = "正在执行原画质无损流复制...";
       try {
         await ffmpegInstance.run("-i", inName, "-c", "copy", "-movflags", "+faststart", "output.mp4");
-        // 检查输出文件是否有效（部分不兼容 AVI 流复制会生成 0 字节文件）
         const check = ffmpegInstance.FS("readFile", "output.mp4");
         if (!check || check.byteLength < 1024) throw new Error("Fallback needed");
         modeNote = "原画质无损直转 (0 损失)";
       } catch (e) {
-        // 自动兜底：老式 AVI 编码无法直接封装进 MP4 时，启用母带级 CRF 16 重编码
         progText.textContent = "检测到老式封装编码，自动切换为母带级无损感重编码（CRF 16）...";
         await ffmpegInstance.run(
           "-i", inName,
@@ -388,27 +563,25 @@ document.getElementById("avConvertBtn").onclick = async () => {
       mp4: "video/mp4", mkv: "video/x-matroska", webm: "video/webm", gif: "image/gif",
       flac: "audio/flac", wav: "audio/wav", mp3: "audio/mpeg", m4a: "audio/mp4"
     };
-    const blob = new Blob([data.buffer], { type: mimeMap[outExt] || "application/octet-stream" });
-    if (lastAvUrl) URL.revokeObjectURL(lastAvUrl);
-    lastAvUrl = URL.createObjectURL(blob);
+    const blobUrl = trackUrl(URL.createObjectURL(new Blob([data.buffer], { type: mimeMap[outExt] || "application/octet-stream" })));
 
-    const baseName = currentAvFile.name.replace(/\.[^.]+$/, "");
     document.getElementById("avStat").innerHTML =
-      `原始：<b>${formatBytes(currentAvFile.size)}</b> → 转换后：<b>${formatBytes(blob.size)}</b> <span class="badge-save">${modeNote}</span>`;
+      `原始：<b>${formatBytes(currentAvFile.size)}</b> → 转换后：<b>${formatBytes(data.byteLength)}</b> <span class="badge-save">${modeNote}</span>`;
 
     const playerWrap = document.getElementById("avPlayerWrap");
     if (["flac", "wav", "mp3", "m4a"].includes(outExt)) {
-      playerWrap.innerHTML = `<audio class="preview-media" controls src="${lastAvUrl}"></audio>`;
+      playerWrap.innerHTML = `<audio class="preview-media" controls src="${blobUrl}"></audio>`;
     } else if (outExt === "gif") {
-      playerWrap.innerHTML = `<img class="preview-img" src="${lastAvUrl}" alt="GIF预览">`;
+      playerWrap.innerHTML = `<img class="preview-img" src="${blobUrl}" alt="GIF预览">`;
     } else if (outExt === "mkv") {
       playerWrap.innerHTML = `<div style="font-size:12.5px;color:var(--ink-soft);margin:8px 0">MKV 封装已完成，请点击下方按钮下载后使用本地播放器观看</div>`;
     } else {
-      playerWrap.innerHTML = `<video class="preview-media" controls src="${lastAvUrl}"></video>`;
+      playerWrap.innerHTML = `<video class="preview-media" controls src="${blobUrl}"></video>`;
     }
 
     const dl = document.getElementById("avDownload");
-    dl.href = lastAvUrl;
+    dl.style.display = "inline-flex";
+    dl.href = blobUrl;
     dl.download = `${baseName}.${outExt}`;
 
     progFill.style.width = "100%";
