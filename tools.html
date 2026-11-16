@@ -336,6 +336,8 @@ function injectAppleLivePhotoExif(jpegBytes, uuid) {
 }
 
 /* 写入安卓 Motion Photo XMP 并将 MP4 封装进 JPG 尾部 */
+/* 写入安卓双协议 Motion Photo XMP（兼容旧版 MicroVideo 与新版 Android 11+ 相册） */
+/* 写入安卓双协议 Motion Photo XMP（兼容旧版 MicroVideo 与新版 Android 11+ 相册） */
 function buildAndroidMotionPhoto(jpegBytes, mp4Bytes) {
   const enc = new TextEncoder();
   const xmpHeader = enc.encode("http://ns.adobe.com/xap/1.0/\0");
@@ -343,10 +345,20 @@ function buildAndroidMotionPhoto(jpegBytes, mp4Bytes) {
     `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>` +
     `<x:xmpmeta xmlns:x="adobe:ns:meta/">` +
     `<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
-    `<rdf:Description rdf:about="" xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" ` +
+    `<rdf:Description rdf:about="" ` +
+    `xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" ` +
+    `xmlns:Container="http://ns.google.com/photos/1.0/container/" ` +
+    `xmlns:Item="http://ns.google.com/photos/1.0/container/item/" ` +
+    `GCamera:MotionPhoto="1" GCamera:MotionPhotoVersion="1" ` +
+    `GCamera:MotionPhotoPresentationTimestampUs="1500000" ` +
     `GCamera:MicroVideo="1" GCamera:MicroVideoVersion="1" ` +
-    `GCamera:MicroVideoOffset="${mp4Bytes.length}" GCamera:MicroVideoPresentationTimestampUs="1500000"/>` +
-    `</rdf:RDF></x:xmpmeta><?xpacket end="w"?>`
+    `GCamera:MicroVideoOffset="${mp4Bytes.length}" ` +
+    `GCamera:MicroVideoPresentationTimestampUs="1500000">` +
+    `<Container:Directory><rdf:Seq>` +
+    `<rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="image/jpeg" Item:Semantic="Primary" Item:Length="0" Item:Padding="0"/></rdf:li>` +
+    `<rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="video/mp4" Item:Semantic="MotionPhoto" Item:Length="${mp4Bytes.length}" Item:Padding="0"/></rdf:li>` +
+    `</rdf:Seq></Container:Directory>` +
+    `</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>`
   );
   const app1PayloadLen = 2 + xmpHeader.length + xmpXml.length;
   const app1 = new Uint8Array(2 + app1PayloadLen);
