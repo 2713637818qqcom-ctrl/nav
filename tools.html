@@ -506,17 +506,16 @@ document.getElementById("avConvertBtn").onclick = async () => {
 
       if (mode === "live_ios") {
         const uuid = generateUUID();
-        const rawMov = await runSingleFFmpeg(
+        const rawMp4 = await runSingleFFmpeg(
           inputUint8, inName,
           [
-            "-i", inName, "-t", "3",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "18",
-            "-c:a", "aac", "-b:a", "192k",
-            "-movflags", "use_metadata_tags+faststart",
-            "-metadata", `com.apple.quicktime.content.identifier=${uuid}`,
-            "live.mov"
+            "-i", inName, "-t", "5",
+            "-c:v", "libx264", "-profile:v", "main", "-bf", "0",
+            "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "20",
+            "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+            "motion.mp4"
           ],
-          "live.mov",
+          "motion.mp4",
           updateProgress
         );
         const pairedJpg = injectAppleLivePhotoExif(rawJpg, uuid);
